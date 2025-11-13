@@ -148,8 +148,12 @@ ALTER TABLE public.reserva ADD CONSTRAINT cliente_fk FOREIGN KEY (id_cliente_cli
 REFERENCES public.cliente (id_cliente) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- =================================================================
+-- INSERÇÃO DE DADOS INICIAIS (10 Clientes, 10 Destinos)
+-- =================================================================
+
 -- Inserção de 10 clientes com nome, cpf e email na tabela cliente
-INSERT INTO cliente (cliente_nome, cliente_cpf, cliente_email) VALUES
+INSERT INTO public.cliente (cliente_nome, cliente_cpf, cliente_email) VALUES
 ('Ana Beatriz Silva', '123.456.789-01', 'ana.silva@email.com'),
 ('Bruno Henrique Costa', '234.567.890-12', 'bruno.costa@email.com'),
 ('Camila Rocha Almeida', '345.678.901-23', 'camila.almeida@email.com'),
@@ -162,10 +166,10 @@ INSERT INTO cliente (cliente_nome, cliente_cpf, cliente_email) VALUES
 ('Juliana Pinto Azevedo', '012.345.678-90', 'juliana.azevedo@email.com');
 
 -- Select para confirmar a inserção dos clientes na tabela cliente
-SELECT * FROM cliente
+SELECT * FROM public.cliente;
 	
 -- Inserção de 10 destinos com pais e cidade na tabela destino
-INSERT INTO destino (destino_pais, destino_cidade) VALUES
+INSERT INTO public.destino (destino_pais, destino_cidade) VALUES
 ('Brasil', 'Rio de Janeiro'),
 ('Argentina', 'Buenos Aires'),
 ('Chile', 'Santiago'),
@@ -178,4 +182,36 @@ INSERT INTO destino (destino_pais, destino_cidade) VALUES
 ('Austrália', 'Sydney');
 
 -- Select para confirmar a inserção dos destinos na tablea destino
-SELECT * FROM destino
+SELECT * FROM public.destino;
+
+
+INSERT INTO public.fornecedor (fornecedor_nome, fornecedor_tipo, fornecedor_status) VALUES
+('Hotel Sol & Mar', 'Hospedagem', 'A'), 	
+('Voa Rápido S/A', 'Transporte Aéreo', 'A'), 	
+('Guia Tur SP', 'Agência Turismo', 'A'), 	
+('Pousada da Montanha', 'Hospedagem', 'A'), 	
+('RodoExpresso BR', 'Transporte Rodoviário', 'A'), 	
+('Museum Corp', 'Atração Cultural', 'A'), 	
+('Tokyo Rail', 'Transporte Ferroviário', 'A'), 	
+('Hostel Amigo', 'Hospedagem', 'A'), 		
+('Tours Europa', 'Agência Turismo', 'A'), 	
+('Ferry Sydney', 'Transporte Marítimo', 'A'); 	
+
+-- Select para confirmar a inserção dos fornecedores
+SELECT * FROM public.fornecedor;
+
+
+INSERT INTO public.servico (servico_nome, servico_tipo, id_fornecedor_fornecedor) VALUES
+('Diária Luxo Rio', 'Hospedagem', 1),
+('Voo SP-Paris', 'Transporte', 2),
+('City Tour SP', 'Atrativo', 3),
+('Chalé Simples', 'Hospedagem', 4),
+('Ônibus RJ-MG', 'Transporte', 5),
+('Ingresso Arte', 'Atrativo', 6),
+('Trem-Bala Tóquio', 'Transporte', 7),
+('Cama em Dorm.', 'Hospedagem', 8),
+('Tour Roma Coliseu', 'Atrativo', 9),
+('Passeio Baía', 'Transporte', 10);
+
+-- Select para confirmar a inserção dos serviços
+SELECT * FROM public.servico;
