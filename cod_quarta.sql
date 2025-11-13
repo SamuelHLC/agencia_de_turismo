@@ -1,23 +1,10 @@
--- ** Database generated with pgModeler (PostgreSQL Database Modeler).
--- ** pgModeler version: 1.2.2
--- ** PostgreSQL version: 18.0
--- ** Project Site: pgmodeler.io
--- ** Model Author: ---
-
--- ** Database creation must be performed outside a multi lined SQL file. 
--- ** These commands were put in this file only as a convenience.
-
--- object: new_database | type: DATABASE --
--- DROP DATABASE IF EXISTS new_database;
+-- Cria o banco de dados principal
 CREATE DATABASE new_database;
--- ddl-end --
 
-
+-- Define o caminho de busca padrão para o esquema "public"
 SET search_path TO pg_catalog,public;
--- ddl-end --
 
--- object: public.servico | type: TABLE --
--- DROP TABLE IF EXISTS public.servico CASCADE;
+-- Cria a tabela de serviços
 CREATE TABLE public.servico (
 	id_servico serial NOT NULL,
 	servico_nome varchar(30),
@@ -26,12 +13,10 @@ CREATE TABLE public.servico (
 	id_fornecedor_fornecedor integer,
 	CONSTRAINT servico_pk PRIMARY KEY (id_servico)
 );
--- ddl-end --
-ALTER TABLE public.servico OWNER TO postgres;
--- ddl-end --
 
--- object: public.fornecedor | type: TABLE --
--- DROP TABLE IF EXISTS public.fornecedor CASCADE;
+ALTER TABLE public.servico OWNER TO postgres;
+
+-- Cria a tabela de fornecedores
 CREATE TABLE public.fornecedor (
 	id_fornecedor serial NOT NULL,
 	fornecedor_nome varchar(50),
@@ -39,130 +24,96 @@ CREATE TABLE public.fornecedor (
 	fornecedor_status char,
 	CONSTRAINT fornecedor_pk PRIMARY KEY (id_fornecedor)
 );
--- ddl-end --
 ALTER TABLE public.fornecedor OWNER TO postgres;
--- ddl-end --
 
--- object: fornecedor_fk | type: CONSTRAINT --
--- ALTER TABLE public.servico DROP CONSTRAINT IF EXISTS fornecedor_fk CASCADE;
+-- Cria chave estrangeira entre serviço e fornecedor
 ALTER TABLE public.servico ADD CONSTRAINT fornecedor_fk FOREIGN KEY (id_fornecedor_fornecedor)
 REFERENCES public.fornecedor (id_fornecedor) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: public.atrativo | type: TABLE --
--- DROP TABLE IF EXISTS public.atrativo CASCADE;
+-- Cria a tabela de atrativos turísticos
 CREATE TABLE public.atrativo (
 	atrativo_nome varchar(50),
 	atrativo_horario_funcionando time,
 	atrativo_tipo varchar(30),
 	id_servico_servico integer,
-	id_destino_destino integer,
-
+	id_destino_destino integer
 );
--- ddl-end --
-ALTER TABLE public.atrativo OWNER TO postgres;
--- ddl-end --
 
--- object: servico_fk | type: CONSTRAINT --
--- ALTER TABLE public.atrativo DROP CONSTRAINT IF EXISTS servico_fk CASCADE;
+ALTER TABLE public.atrativo OWNER TO postgres;
+
+-- Cria chave estrangeira entre atrativo e serviço
 ALTER TABLE public.atrativo ADD CONSTRAINT servico_fk FOREIGN KEY (id_servico_servico)
 REFERENCES public.servico (id_servico) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: atrativo_uq | type: CONSTRAINT --
--- ALTER TABLE public.atrativo DROP CONSTRAINT IF EXISTS atrativo_uq CASCADE;
+-- Garante que cada atrativo esteja vinculado a apenas um serviço (único)
 ALTER TABLE public.atrativo ADD CONSTRAINT atrativo_uq UNIQUE (id_servico_servico);
--- ddl-end --
 
--- object: public.hospedagem | type: TABLE --
--- DROP TABLE IF EXISTS public.hospedagem CASCADE;
+-- Cria a tabela de hospedagens
 CREATE TABLE public.hospedagem (
 	hospedagem_nome_propriedade varchar(50),
 	hospedagem_tipo_acomodacao varchar(40),
 	hospedagem_categoria varchar(40),
 	id_servico_servico integer,
-	id_destino_destino integer,
-
+	id_destino_destino integer
 );
--- ddl-end --
-ALTER TABLE public.hospedagem OWNER TO postgres;
--- ddl-end --
 
--- object: servico_fk | type: CONSTRAINT --
--- ALTER TABLE public.hospedagem DROP CONSTRAINT IF EXISTS servico_fk CASCADE;
+ALTER TABLE public.hospedagem OWNER TO postgres;
+
+-- Cria chave estrangeira entre hospedagem e serviço
 ALTER TABLE public.hospedagem ADD CONSTRAINT servico_fk FOREIGN KEY (id_servico_servico)
 REFERENCES public.servico (id_servico) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: hospedagem_uq | type: CONSTRAINT --
--- ALTER TABLE public.hospedagem DROP CONSTRAINT IF EXISTS hospedagem_uq CASCADE;
+-- Garante que cada hospedagem esteja vinculada a apenas um serviço
 ALTER TABLE public.hospedagem ADD CONSTRAINT hospedagem_uq UNIQUE (id_servico_servico);
--- ddl-end --
 
--- object: public.transporte | type: TABLE --
--- DROP TABLE IF EXISTS public.transporte CASCADE;
+-- Cria a tabela de transportes
 CREATE TABLE public.transporte (
 	transporte_tipo char(1),
 	transporte_origem varchar(100),
 	transporte_hora_partida time,
 	id_servico_servico integer,
-	id_destino_destino integer,
-
+	id_destino_destino integer
 );
--- ddl-end --
-ALTER TABLE public.transporte OWNER TO postgres;
--- ddl-end --
 
--- object: servico_fk | type: CONSTRAINT --
--- ALTER TABLE public.transporte DROP CONSTRAINT IF EXISTS servico_fk CASCADE;
+ALTER TABLE public.transporte OWNER TO postgres;
+
+-- Cria chave estrangeira entre transporte e serviço
 ALTER TABLE public.transporte ADD CONSTRAINT servico_fk FOREIGN KEY (id_servico_servico)
 REFERENCES public.servico (id_servico) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: transporte_uq | type: CONSTRAINT --
--- ALTER TABLE public.transporte DROP CONSTRAINT IF EXISTS transporte_uq CASCADE;
+-- Garante que cada transporte esteja vinculado a apenas um serviço
 ALTER TABLE public.transporte ADD CONSTRAINT transporte_uq UNIQUE (id_servico_servico);
--- ddl-end --
 
--- object: public.destino | type: TABLE --
--- DROP TABLE IF EXISTS public.destino CASCADE;
+-- Cria a tabela de destinos turísticos
 CREATE TABLE public.destino (
 	id_destino serial NOT NULL,
 	destino_pais varchar(30),
 	destino_cidade varchar(40),
 	CONSTRAINT destino_pk PRIMARY KEY (id_destino)
 );
--- ddl-end --
-ALTER TABLE public.destino OWNER TO postgres;
--- ddl-end --
 
--- object: destino_fk | type: CONSTRAINT --
--- ALTER TABLE public.transporte DROP CONSTRAINT IF EXISTS destino_fk CASCADE;
+ALTER TABLE public.destino OWNER TO postgres;
+
+-- Cria chave estrangeira entre transporte e destino
 ALTER TABLE public.transporte ADD CONSTRAINT destino_fk FOREIGN KEY (id_destino_destino)
 REFERENCES public.destino (id_destino) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: destino_fk | type: CONSTRAINT --
--- ALTER TABLE public.hospedagem DROP CONSTRAINT IF EXISTS destino_fk CASCADE;
+-- Cria chave estrangeira entre hospedagem e destino
 ALTER TABLE public.hospedagem ADD CONSTRAINT destino_fk FOREIGN KEY (id_destino_destino)
 REFERENCES public.destino (id_destino) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: destino_fk | type: CONSTRAINT --
--- ALTER TABLE public.atrativo DROP CONSTRAINT IF EXISTS destino_fk CASCADE;
+-- Cria chave estrangeira entre atrativo e destino
 ALTER TABLE public.atrativo ADD CONSTRAINT destino_fk FOREIGN KEY (id_destino_destino)
 REFERENCES public.destino (id_destino) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: public.reserva | type: TABLE --
--- DROP TABLE IF EXISTS public.reserva CASCADE;
+-- Cria a tabela de reservas
 CREATE TABLE public.reserva (
 	id_reserva serial NOT NULL,
 	reserva_data date,
@@ -173,35 +124,58 @@ CREATE TABLE public.reserva (
 	id_cliente_cliente integer,
 	CONSTRAINT reserva_pk PRIMARY KEY (id_reserva)
 );
--- ddl-end --
-ALTER TABLE public.reserva OWNER TO postgres;
--- ddl-end --
 
--- object: servico_fk | type: CONSTRAINT --
--- ALTER TABLE public.reserva DROP CONSTRAINT IF EXISTS servico_fk CASCADE;
+ALTER TABLE public.reserva OWNER TO postgres;
+
+-- Cria chave estrangeira entre reserva e serviço
 ALTER TABLE public.reserva ADD CONSTRAINT servico_fk FOREIGN KEY (id_servico_servico)
 REFERENCES public.servico (id_servico) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
--- object: public.cliente | type: TABLE --
--- DROP TABLE IF EXISTS public.cliente CASCADE;
+-- Cria a tabela de clientes
 CREATE TABLE public.cliente (
 	id_cliente serial NOT NULL,
 	cliente_nome varchar(100),
-	cliente_cpf varchar(11),
+	cliente_cpf varchar(15),
 	cliente_email varchar(50),
 	CONSTRAINT cliente_pk PRIMARY KEY (id_cliente)
 );
--- ddl-end --
-ALTER TABLE public.cliente OWNER TO postgres;
--- ddl-end --
 
--- object: cliente_fk | type: CONSTRAINT --
--- ALTER TABLE public.reserva DROP CONSTRAINT IF EXISTS cliente_fk CASCADE;
+ALTER TABLE public.cliente OWNER TO postgres;
+
+-- Cria chave estrangeira entre reserva e cliente
 ALTER TABLE public.reserva ADD CONSTRAINT cliente_fk FOREIGN KEY (id_cliente_cliente)
 REFERENCES public.cliente (id_cliente) MATCH FULL
 ON DELETE SET NULL ON UPDATE CASCADE;
--- ddl-end --
 
+-- Inserção de 10 clientes com nome, cpf e email na tabela cliente
+INSERT INTO cliente (cliente_nome, cliente_cpf, cliente_email) VALUES
+('Ana Beatriz Silva', '123.456.789-01', 'ana.silva@email.com'),
+('Bruno Henrique Costa', '234.567.890-12', 'bruno.costa@email.com'),
+('Camila Rocha Almeida', '345.678.901-23', 'camila.almeida@email.com'),
+('Daniel Ferreira Souza', '456.789.012-34', 'daniel.souza@email.com'),
+('Eduardo Lima Pereira', '567.890.123-45', 'eduardo.pereira@email.com'),
+('Fernanda Oliveira Melo', '678.901.234-56', 'fernanda.melo@email.com'),
+('Gustavo Martins Ramos', '789.012.345-67', 'gustavo.ramos@email.com'),
+('Helena Duarte Cardoso', '890.123.456-78', 'helena.cardoso@email.com'),
+('Igor Nunes Batista', '901.234.567-89', 'igor.batista@email.com'),
+('Juliana Pinto Azevedo', '012.345.678-90', 'juliana.azevedo@email.com');
 
+-- Select para confirmar a inserção dos clientes na tabela cliente
+SELECT * FROM cliente
+	
+-- Inserção de 10 destinos com pais e cidade na tabela destino
+INSERT INTO destino (destino_pais, destino_cidade) VALUES
+('Brasil', 'Rio de Janeiro'),
+('Argentina', 'Buenos Aires'),
+('Chile', 'Santiago'),
+('Estados Unidos', 'Nova York'),
+('França', 'Paris'),
+('Itália', 'Roma'),
+('Japão', 'Tóquio'),
+('Canadá', 'Toronto'),
+('Portugal', 'Lisboa'),
+('Austrália', 'Sydney');
+
+-- Select para confirmar a inserção dos destinos na tablea destino
+SELECT * FROM destino
