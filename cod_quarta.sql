@@ -220,3 +220,56 @@ INSERT INTO transporte (tipo, origem, destino, data_partida, data_chegada, preco
 
 -- Confirmar inserção
 SELECT * FROM public.transporte;
+
+--tabela reserva (alex)
+CREATE TABLE public.reserva (
+    id_reserva SERIAL PRIMARY KEY,
+    reserva_data DATE,
+    reserva__data_inicio DATE,
+    reserva_valor_total FLOAT,
+    reserva_status CHAR(1),
+    id_servico_servico INTEGER,
+    id_cliente_cliente INTEGER,
+    CONSTRAINT servico_fk FOREIGN KEY (id_servico_servico) REFERENCES servico(id_servico),
+    CONSTRAINT cliente_fk FOREIGN KEY (id_cliente_cliente) REFERENCES cliente(id_cliente)
+);
+
+--inserts 10 reservas (alex)
+INSERT INTO reserva (reserva_data, reserva__data_inicio, reserva_valor_total, reserva_status, id_servico_servico, id_cliente_cliente)
+VALUES 
+('2025-01-01', '2025-01-05', 350.00, 'A', 1, 1),
+('2025-01-03', '2025-01-04', 200.00, 'A', 2, 1),
+('2025-02-10', '2025-02-12', 500.00, 'C', 3, 2),
+('2025-03-15', '2025-03-16', 150.00, 'A', 1, 3),
+('2025-03-20', '2025-03-22', 320.00, 'F', 4, 4),
+('2025-04-01', '2025-04-10', 1200.00, 'A', 2, 5),
+('2025-04-05', '2025-04-07', 450.00, 'C', 3, 6),
+('2025-05-02', '2025-05-03', 180.00, 'A', 1, 7),
+('2025-05-10', '2025-05-11', 220.00, 'F', 4, 8),
+('2025-06-01', '2025-06-05', 900.00, 'A', 5, 9);
+
+--tabela atrativo (alex)
+CREATE TABLE public.atrativo (
+    atrativo_nome VARCHAR(50),
+    atrativo_horario_funcionando TIME,
+    atrativo_tipo VARCHAR(30),
+    id_servico_servico INTEGER,
+    id_destino_destino INTEGER,
+    CONSTRAINT servico_fk FOREIGN KEY (id_servico_servico) REFERENCES servico(id_servico),
+    CONSTRAINT destino_fk FOREIGN KEY (id_destino_destino) REFERENCES destino(id_destino),
+    CONSTRAINT atrativo_uq UNIQUE (atrativo_nome)
+);
+
+-- 10 insert atrativos (alex)
+INSERT INTO atrativo (atrativo_nome, atrativo_horario_funcionando, atrativo_tipo, id_servico_servico, id_destino_destino)
+VALUES
+('Praia Central', '08:00', 'Natural', 1, 1),
+('Museu Histórico', '09:00', 'Cultural', 2, 1),
+('Parque das Aves', '07:30', 'Natural', 3, 2),
+('Mirante da Serra', '10:00', 'Paisagem', 4, 2),
+('Aquário Azul', '08:30', 'Educativo', 5, 3),
+('Centro Gastronômico', '18:00', 'Culinária', 1, 3),
+('Trilha da Mata', '06:00', 'Aventura', 2, 4),
+('Cachoeira Bela Vista', '07:00', 'Natural', 3, 4),
+('Planetário Municipal', '14:00', 'Cultural', 4, 5),
+('Feira de Artesanato', '10:00', 'Comércio', 5, 5);
