@@ -70,12 +70,14 @@ ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE public.hospedagem ADD CONSTRAINT hospedagem_uq UNIQUE (id_servico_servico);
 
 -- Cria a tabela de transportes
-CREATE TABLE public.transporte (
-	transporte_tipo char(1),
-	transporte_origem varchar(100),
-	transporte_hora_partida time,
-	id_servico_servico integer,
-	id_destino_destino integer
+CREATE TABLE transporte (
+    id_transporte SERIAL PRIMARY KEY,
+    tipo VARCHAR(50) NOT NULL,
+    origem VARCHAR(100) NOT NULL,
+    destino VARCHAR(100) NOT NULL,
+    data_partida DATE NOT NULL,
+    data_chegada DATE NOT NULL,
+    preco DECIMAL(10,2) NOT NULL
 );
 
 ALTER TABLE public.transporte OWNER TO postgres;
@@ -201,23 +203,21 @@ INSERT INTO public.servico (servico_nome, servico_tipo, id_fornecedor_fornecedor
 ('Passeio Baía', 'Transporte', 10);
 
 -- Inserção de 10 transportes
-INSERT INTO public.transporte (
-    transporte_tipo, 
-    transporte_origem, 
-    transporte_hora_partida, 
-    id_servico_servico, 
-    id_destino_destino
-) VALUES
-('A', 'São Paulo', '10:30:00', 2, 5),   -- Voo SP → Paris
-('R', 'Rio de Janeiro', '08:00:00', 5, 1), -- Ônibus RJ → MG (destino RJ como exemplo)
-('F', 'Tóquio', '09:15:00', 7, 7),      -- Trem-bala Tóquio
-('M', 'Sydney', '13:00:00', 10, 10),    -- Ferry Sydney
-('A', 'Buenos Aires', '07:45:00', 2, 2),-- Voo interno Argentina
-('R', 'Roma', '06:30:00', 5, 6),        -- Ônibus Itália
-('F', 'Toronto', '11:00:00', 7, 8),     -- Trem Toronto
-('M', 'Lisboa', '15:20:00', 10, 9),     -- Ferry Portugal
-('A', 'Nova York', '12:45:00', 2, 4),   -- Voo interno EUA
-('R', 'Santiago', '05:50:00', 5, 3);    -- Ônibus Chile
+TRUNCATE public.transporte RESTART IDENTITY;
+
+-- Inserções corrigidas (10 registros)
+INSERT INTO transporte (tipo, origem, destino, data_partida, data_chegada, preco) VALUES
+('Ônibus', 'São Paulo', 'Rio de Janeiro', '2025-01-10', '2025-01-10', 150.00),
+('Avião', 'Brasília', 'Salvador', '2025-02-05', '2025-02-05', 750.00),
+('Navio', 'Rio de Janeiro', 'Buenos Aires', '2025-03-12', '2025-03-15', 2200.00),
+('Metrô', 'São Paulo', 'São Paulo', '2025-01-01', '2025-01-01', 4.40),
+('Uber', 'Curitiba', 'Curitiba', '2025-01-18', '2025-01-18', 22.50),
+('Táxi', 'Porto Alegre', 'Porto Alegre', '2025-04-10', '2025-04-10', 35.90),
+('Ônibus', 'Fortaleza', 'Natal', '2025-05-03', '2025-05-03', 120.00),
+('Avião', 'Manaus', 'São Paulo', '2025-06-20', '2025-06-20', 980.00),
+('Trem', 'Belo Horizonte', 'Vitória', '2025-07-14', '2025-07-14', 89.90),
+('Navio', 'Santos', 'Ilhabela', '2025-08-02', '2025-08-02', 300.00);
+
 
 -- Confirmar inserção
 SELECT * FROM public.transporte;
