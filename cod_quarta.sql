@@ -205,7 +205,6 @@ INSERT INTO public.servico (servico_nome, servico_tipo, id_fornecedor_fornecedor
 -- Inserção de 10 transportes
 TRUNCATE public.transporte RESTART IDENTITY;
 
--- Inserções corrigidas (10 registros)
 INSERT INTO transporte (tipo, origem, destino, data_partida, data_chegada, preco) VALUES
 ('Ônibus', 'São Paulo', 'Rio de Janeiro', '2025-01-10', '2025-01-10', 150.00),
 ('Avião', 'Brasília', 'Salvador', '2025-02-05', '2025-02-05', 750.00),
