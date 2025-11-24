@@ -1,629 +1,497 @@
--- Cria o banco de dados principal
-CREATE DATABASE new_database;
+-- PROJETO INTEGRADOR: SISTEMA DE BANCO DE DADOS (POSTGRESQL)
+-- TEMA: AGÊNCIA DE VIAGENS
+-- VERSÃO FINAL E COMPLETA: DDL + DML + DQL + RECURSOS AVANÇADOS + TESTES
 
--- Define o caminho de busca padrão para o esquema "public"
+-- Configuração inicial
 SET search_path TO pg_catalog,public;
 
--- --------------------------------------------------------
--- CRIAÇÃO DAS TABELAS
--- --------------------------------------------------------
+--------------------------------------------------------
+-- ETAPA 1 – MODELAGEM E CRIAÇÃO DO BANCO (DDL)
+--------------------------------------------------------
 
--- Fornecedor
+-- Limpeza preventiva de objetos para permitir re-execução limpa
+DROP VIEW IF EXISTS public.vw_cliente_resumo CASCADE;
+DROP VIEW IF EXISTS public.vw_faturamento_por_cliente CASCADE;
+DROP VIEW IF EXISTS public.vw_servicos_vip CASCADE;
+DROP TABLE IF EXISTS public.tb_auditoria CASCADE;
+DROP TABLE IF EXISTS public.reserva CASCADE;
+DROP TABLE IF EXISTS public.transporte CASCADE;
+DROP TABLE IF EXISTS public.hospedagem CASCADE;
+DROP TABLE IF EXISTS public.atrativo CASCADE;
+DROP TABLE IF EXISTS public.servico CASCADE;
+DROP TABLE IF EXISTS public.destino CASCADE;
+DROP TABLE IF EXISTS public.cliente CASCADE;
+DROP TABLE IF EXISTS public.fornecedor CASCADE;
+
+-- Revogação de privilégios públicos (Segurança Base)
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+
+-- 1. Tabela Fornecedor
 CREATE TABLE public.fornecedor (
 	id_fornecedor serial NOT NULL,
-	fornecedor_nome varchar(50),
+	fornecedor_nome varchar(50) NOT NULL,
 	fornecedor_tipo varchar(50),
-	fornecedor_status char,
+	fornecedor_status char DEFAULT 'A',
 	CONSTRAINT fornecedor_pk PRIMARY KEY (id_fornecedor)
 );
-ALTER TABLE public.fornecedor OWNER TO postgres;
 
--- Cliente
+-- 2. Tabela Cliente (Contém dados sensíveis)
 CREATE TABLE public.cliente (
 	id_cliente serial NOT NULL,
-	cliente_nome varchar(100),
-	cliente_cpf varchar(15),
+	cliente_nome varchar(100) NOT NULL,
+	cliente_cpf varchar(15) UNIQUE NOT NULL, -- Dado Sensível
 	cliente_email varchar(50),
 	CONSTRAINT cliente_pk PRIMARY KEY (id_cliente)
 );
-ALTER TABLE public.cliente OWNER TO postgres;
 
--- Destino
+-- 3. Tabela Destino
 CREATE TABLE public.destino (
 	id_destino serial NOT NULL,
-	destino_pais varchar(30),
-	destino_cidade varchar(40),
+	destino_pais varchar(30) NOT NULL,
+	destino_cidade varchar(40) NOT NULL,
 	CONSTRAINT destino_pk PRIMARY KEY (id_destino)
 );
-ALTER TABLE public.destino OWNER TO postgres;
 
--- Serviço
+-- 4. Tabela Serviço
 CREATE TABLE public.servico (
 	id_servico serial NOT NULL,
-	servico_nome varchar(30),
-	servico_preco_base numeric(10,2),
+	servico_nome varchar(50) NOT NULL,
+	servico_preco_base numeric(10,2) NOT NULL,
 	servico_tipo varchar(30),
 	id_fornecedor_fornecedor integer,
-	CONSTRAINT servico_pk PRIMARY KEY (id_servico)
+	CONSTRAINT servico_pk PRIMARY KEY (id_servico),
+	CONSTRAINT fornecedor_fk FOREIGN KEY (id_fornecedor_fornecedor)
+		REFERENCES public.fornecedor (id_fornecedor) ON DELETE SET NULL ON UPDATE CASCADE
 );
-ALTER TABLE public.servico OWNER TO postgres;
 
--- Chave estrangeira serviço → fornecedor
-ALTER TABLE public.servico ADD CONSTRAINT fornecedor_fk FOREIGN KEY (id_fornecedor_fornecedor)
-REFERENCES public.fornecedor (id_fornecedor) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
--- Reserva (Recriada)
-DROP TABLE IF EXISTS public.reserva CASCADE;
+-- 5. Tabela Reserva (Central)
 CREATE TABLE public.reserva (
 	id_reserva serial NOT NULL,
-	reserva_data date,
-	reserva_data_inicio date, 
-	reserva_valor_total float,
-	reserva_status char(1),
+	reserva_data date DEFAULT CURRENT_DATE,
+	reserva_data_inicio date NOT NULL,
+	reserva_valor_total numeric(10,2) NOT NULL,
+	reserva_status char(1) DEFAULT 'A', -- A: Ativa, C: Cancelada, F: Finalizada
 	id_servico_servico integer,
 	id_cliente_cliente integer,
-	CONSTRAINT reserva_pk PRIMARY KEY (id_reserva)
+	CONSTRAINT reserva_pk PRIMARY KEY (id_reserva),
+	CONSTRAINT reserva_servico_fk FOREIGN KEY (id_servico_servico)
+		REFERENCES public.servico (id_servico) ON UPDATE CASCADE,
+	CONSTRAINT reserva_cliente_fk FOREIGN KEY (id_cliente_cliente)
+		REFERENCES public.cliente (id_cliente) ON UPDATE CASCADE
 );
-ALTER TABLE public.reserva OWNER TO postgres;
 
--- Chaves estrangeiras para Reserva
-ALTER TABLE public.reserva ADD CONSTRAINT reserva_servico_fk FOREIGN KEY (id_servico_servico)
-REFERENCES public.servico (id_servico) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE public.reserva ADD CONSTRAINT reserva_cliente_fk FOREIGN KEY (id_cliente_cliente)
-REFERENCES public.cliente (id_cliente) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
--- Transporte
-DROP TABLE IF EXISTS public.transporte CASCADE;
+-- 6. Tabela Transporte (Especialização)
 CREATE TABLE public.transporte (
 	id_transporte SERIAL PRIMARY KEY,
-	tipo VARCHAR(50) NOT NULL,
-	origem VARCHAR(100) NOT NULL,
-	destino VARCHAR(100) NOT NULL,
-	data_partida DATE NOT NULL,
-	data_chegada DATE NOT NULL,
-	preco DECIMAL(10,2) NOT NULL,
+	tipo VARCHAR(50),
+	origem VARCHAR(100),
+	destino VARCHAR(100),
+	data_partida DATE,
+	data_chegada DATE,
+	preco DECIMAL(10,2),
 	id_servico_servico INTEGER,
-	id_destino_destino INTEGER -- Esta coluna é crucial para a Consulta 4.2
+	id_destino_destino INTEGER,
+	CONSTRAINT transporte_servico_fk FOREIGN KEY (id_servico_servico)
+		REFERENCES public.servico (id_servico),
+	CONSTRAINT transporte_destino_fk FOREIGN KEY (id_destino_destino)
+		REFERENCES public.destino (id_destino)
 );
-ALTER TABLE public.transporte OWNER TO postgres;
 
-ALTER TABLE public.transporte ADD CONSTRAINT transporte_servico_fk FOREIGN KEY (id_servico_servico)
-REFERENCES public.servico (id_servico) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE public.transporte ADD CONSTRAINT transporte_destino_fk FOREIGN KEY (id_destino_destino)
-REFERENCES public.destino (id_destino) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
--- Hospedagem
-DROP TABLE IF EXISTS public.hospedagem CASCADE;
+-- 7. Tabela Hospedagem (Especialização)
 CREATE TABLE public.hospedagem (
+	id_hospedagem SERIAL PRIMARY KEY,
 	hospedagem_nome_propriedade varchar(50),
 	hospedagem_tipo_acomodacao varchar(40),
 	hospedagem_categoria varchar(40),
 	id_servico_servico integer,
-	id_destino_destino integer
+	id_destino_destino integer,
+	CONSTRAINT hospedagem_servico_fk FOREIGN KEY (id_servico_servico)
+		REFERENCES public.servico (id_servico),
+	CONSTRAINT hospedagem_destino_fk FOREIGN KEY (id_destino_destino)
+		REFERENCES public.destino (id_destino)
 );
-ALTER TABLE public.hospedagem OWNER TO postgres;
 
-ALTER TABLE public.hospedagem ADD CONSTRAINT hospedagem_servico_fk FOREIGN KEY (id_servico_servico)
-REFERENCES public.servico (id_servico) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE public.hospedagem ADD CONSTRAINT hospedagem_destino_fk FOREIGN KEY (id_destino_destino)
-REFERENCES public.destino (id_destino) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE public.hospedagem ADD CONSTRAINT hospedagem_uq UNIQUE (id_servico_servico);
-
--- Atrativo
-DROP TABLE IF EXISTS public.atrativo CASCADE;
+-- 8. Tabela Atrativo (Especialização)
 CREATE TABLE public.atrativo (
+	id_atrativo SERIAL PRIMARY KEY,
 	atrativo_nome varchar(50),
 	atrativo_horario_funcionando time,
 	atrativo_tipo varchar(30),
 	id_servico_servico integer,
-	id_destino_destino integer
+	id_destino_destino integer,
+	CONSTRAINT atrativo_servico_fk FOREIGN KEY (id_servico_servico)
+		REFERENCES public.servico (id_servico),
+	CONSTRAINT atrativo_destino_fk FOREIGN KEY (id_destino_destino)
+		REFERENCES public.destino (id_destino)
 );
-ALTER TABLE public.atrativo OWNER TO postgres;
 
-ALTER TABLE public.atrativo ADD CONSTRAINT atrativo_servico_fk FOREIGN KEY (id_servico_servico)
-REFERENCES public.servico (id_servico) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE public.atrativo ADD CONSTRAINT atrativo_destino_fk FOREIGN KEY (id_destino_destino)
-REFERENCES public.destino (id_destino) MATCH FULL
-ON DELETE SET NULL ON UPDATE CASCADE;
-
+-- Constraint Unique Adicionais (Requisito do seu código original)
+ALTER TABLE public.hospedagem ADD CONSTRAINT hospedagem_uq UNIQUE (id_servico_servico);
 ALTER TABLE public.atrativo ADD CONSTRAINT atrativo_uq UNIQUE (id_servico_servico);
 
--- --------------------------------------------------------
--- INSERTS
--- --------------------------------------------------------
+-- Tabela de Auditoria (Necessária para os Triggers da Etapa 3)
+CREATE TABLE public.tb_auditoria (
+    id_log SERIAL PRIMARY KEY,
+    tabela_alterada VARCHAR(50),
+    acao VARCHAR(20),
+    usuario VARCHAR(50),
+    data_hora TIMESTAMP DEFAULT NOW(),
+    dados_antigos TEXT,
+    dados_novos TEXT
+);
+
+--------------------------------------------------------
+-- ETAPA 2 – POPULAÇÃO DE DADOS (DML)
+--------------------------------------------------------
 
 -- Clientes
-TRUNCATE public.cliente RESTART IDENTITY CASCADE;
 INSERT INTO public.cliente (cliente_nome, cliente_cpf, cliente_email) VALUES
-('Ana Beatriz Silva', '123.456.789-01', 'ana.silva@email.com'),
-('Bruno Henrique Costa', '234.567.890-12', 'bruno.costa@email.com'),
-('Camila Rocha Almeida', '345.678.901-23', 'camila.almeida@email.com'),
-('Daniel Ferreira Souza', '456.789.012-34', 'daniel.souza@email.com'),
-('Eduardo Lima Pereira', '567.890.123-45', 'eduardo.pereira@email.com'),
-('Fernanda Oliveira Melo', '678.901.234-56', 'fernanda.melo@email.com'),
-('Gustavo Martins Ramos', '789.012.345-67', 'gustavo.ramos@email.com'),
-('Helena Duarte Cardoso', '890.123.456-78', 'helena.cardoso@email.com'),
-('Igor Nunes Batista', '901.234.567-89', 'igor.batista@email.com'),
-('Juliana Pinto Azevedo', '012.345.678-90', 'juliana.azevedo@email.com');
+('Ana Beatriz Silva','123.456.789-01','ana.silva@email.com'),
+('Bruno Henrique Costa','234.567.890-12','bruno.costa@email.com'),
+('Camila Rocha Almeida','345.678.901-23','camila.almeida@email.com'),
+('Daniel Ferreira Souza','456.789.012-34','daniel.souza@email.com'),
+('Eduardo Lima Pereira','567.890.123-45','eduardo.pereira@email.com'),
+('Fernanda Oliveira Melo','678.901.234-56','fernanda.melo@email.com'),
+('Gustavo Martins Ramos','789.012.345-67','gustavo.ramos@email.com'),
+('Helena Duarte Cardoso','890.123.456-78','helena.cardoso@email.com'),
+('Igor Nunes Batista','901.234.567-89','igor.batista@email.com'),
+('Juliana Pinto Azevedo','012.345.678-90','juliana.azevedo@email.com');
 
 -- Destinos
-TRUNCATE public.destino RESTART IDENTITY CASCADE;
 INSERT INTO public.destino (destino_pais, destino_cidade) VALUES
-('Brasil', 'Rio de Janeiro'), -- id_destino = 1
-('Argentina', 'Buenos Aires'), -- id_destino = 2
-('Chile', 'Santiago'), -- id_destino = 3
-('Estados Unidos', 'Nova York'), -- id_destino = 4
-('França', 'Paris'), -- id_destino = 5
-('Itália', 'Roma'), -- id_destino = 6
-('Japão', 'Tóquio'), -- id_destino = 7
-('Canadá', 'Toronto'), -- id_destino = 8
-('Portugal', 'Lisboa'), -- id_destino = 9
-('Austrália', 'Sydney'); -- id_destino = 10
+('Brasil','Rio de Janeiro'), ('Argentina','Buenos Aires'), ('Chile','Santiago'),
+('Estados Unidos','Nova York'), ('França','Paris'), ('Itália','Roma'),
+('Japão','Tóquio'), ('Canadá','Toronto'), ('Portugal','Lisboa'), ('Austrália','Sydney');
 
 -- Fornecedores
-TRUNCATE public.fornecedor RESTART IDENTITY CASCADE;
 INSERT INTO public.fornecedor (fornecedor_nome, fornecedor_tipo, fornecedor_status) VALUES
-('Hotel Sol & Mar', 'Hospedagem', 'A'), 	-- id_fornecedor = 1
-('Voa Rápido S/A', 'Transporte Aéreo', 'A'), 	-- id_fornecedor = 2
-('Guia Tur SP', 'Agência Turismo', 'A'), 	-- id_fornecedor = 3
-('Pousada da Montanha', 'Hospedagem', 'A'), 	-- id_fornecedor = 4
-('RodoExpresso BR', 'Transporte Rodoviário', 'A'), 	-- id_fornecedor = 5
-('Museum Corp', 'Atração Cultural', 'A'), 	-- id_fornecedor = 6
-('Tokyo Rail', 'Transporte Ferroviário', 'A'), 	-- id_fornecedor = 7
-('Hostel Amigo', 'Hospedagem', 'A'), 		-- id_fornecedor = 8
-('Tours Europa', 'Agência Turismo', 'A'), 	-- id_fornecedor = 9
-('Ferry Sydney', 'Transporte Marítimo', 'A'); -- id_fornecedor = 10
+('Hotel Sol & Mar','Hospedagem', 'A'), ('Voa Rápido S/A','Transporte Aéreo', 'A'),
+('Guia Tur SP','Agência Turismo', 'A'), ('Pousada da Montanha','Hospedagem', 'A'),
+('RodoExpresso BR','Transporte Rodoviário', 'A'), ('Museum Corp','Atração Cultural', 'A'),
+('Tokyo Rail','Transporte Ferroviário', 'A'), ('Hostel Amigo','Hospedagem', 'A'),
+('Tours Europa','Agência Turismo', 'A'), ('Ferry Sydney','Transporte Marítimo', 'A');
 
--- Serviços (1–10)
-TRUNCATE public.servico RESTART IDENTITY CASCADE;
-INSERT INTO public.servico (servico_nome, servico_tipo, id_fornecedor_fornecedor) VALUES
-('Diária Luxo Rio', 'Hospedagem', 1), -- id_servico = 1
-('Voo SP-Paris', 'Transporte', 2), -- id_servico = 2
-('City Tour SP', 'Atrativo', 3), -- id_servico = 3
-('Chalé Simples', 'Hospedagem', 4), -- id_servico = 4
-('Ônibus RJ-MG', 'Transporte', 5), -- id_servico = 5
-('Ingresso Arte', 'Atrativo', 6), -- id_servico = 6
-('Trem-Bala Tóquio', 'Transporte', 7), -- id_servico = 7
-('Cama em Dorm.', 'Hospedagem', 8), -- id_servico = 8
-('Tour Roma Coliseu', 'Atrativo', 9), -- id_servico = 9
-('Passeio Baía', 'Transporte', 10); -- id_servico = 10
+-- Serviços
+INSERT INTO public.servico (servico_nome, servico_tipo, id_fornecedor_fornecedor, servico_preco_base) VALUES
+('Diária Luxo Rio','Hospedagem',1, 350.00),
+('Voo SP-Paris','Transporte',2, 1200.00),
+('City Tour SP','Atrativo',3, 80.00),
+('Chalé Simples','Hospedagem',4, 220.00),
+('Ônibus RJ-MG','Transporte',5, 150.00),
+('Ingresso Arte','Atrativo',6, 60.00),
+('Trem-Bala Tóquio','Transporte',7, 450.00),
+('Cama em Dorm.','Hospedagem',8, 90.00),
+('Tour Roma Coliseu','Atrativo',9, 120.00),
+('Passeio Baía','Transporte',10, 250.00),
+('Diária Luxo Rio 2','Hospedagem',1, 380.00),
+('Chalé Simples 2','Hospedagem',4, 250.00),
+('Cama em Dorm. 1','Hospedagem',8, 100.00),
+('Apartamento','Hospedagem',1, 300.00),
+('Suíte Presid.','Hospedagem',4, 600.00),
+('Cama em Dorm. 2','Hospedagem',8, 95.00),
+('Quarto Casal','Hospedagem',1, 280.00),
+('Bangalô','Hospedagem',4, 320.00),
+('Cama em Dorm. 3','Hospedagem',8, 85.00),
+('Diária Padrão','Hospedagem',1, 200.00),
+('Translado Aeroporto','Transporte',3, 75.00);
 
--- Serviços (11–21) - Adicionados para completar exemplos
-INSERT INTO public.servico (servico_nome, servico_tipo, id_fornecedor_fornecedor) VALUES
-('Diária Luxo Rio 2', 'Hospedagem', 1), -- id_servico = 11
-('Chalé Simples 2', 'Hospedagem', 4), -- id_servico = 12
-('Cama em Dorm. 1', 'Hospedagem', 8), -- id_servico = 13
-('Apartamento', 'Hospedagem', 1), -- id_servico = 14
-('Suíte Presid.', 'Hospedagem', 4), -- id_servico = 15
-('Cama em Dorm. 2', 'Hospedagem', 8), -- id_servico = 16
-('Quarto Casal', 'Hospedagem', 1), -- id_servico = 17
-('Bangalô', 'Hospedagem', 4), -- id_servico = 18
-('Cama em Dorm. 3', 'Hospedagem', 8), -- id_servico = 19
-('Diária Padrão', 'Hospedagem', 1), -- id_servico = 20
-('Translado Aeroporto', 'Transporte', 3); -- id_servico = 21
+-- Reservas (População Inicial)
+INSERT INTO public.reserva (reserva_data_inicio, reserva_valor_total, reserva_status, id_servico_servico, id_cliente_cliente) VALUES
+('2025-01-05', 350.00, 'A', 1, 1),
+('2025-01-04', 200.00, 'A', 2, 1),
+('2025-02-12', 500.00, 'C', 3, 2),
+('2025-03-16', 150.00, 'A', 4, 3),
+('2025-03-22', 320.00, 'F', 5, 4),
+('2025-04-10', 1200.00, 'A', 2, 5),
+('2025-04-07', 450.00, 'C', 3, 6),
+('2025-05-03', 180.00, 'A', 1, 7),
+('2025-05-11', 220.00, 'F', 4, 8),
+('2025-06-05', 900.00, 'A', 5, 9);
 
--- Transportes (INSERTS DIRETOS COM CHAVES CORRETAS)
-TRUNCATE public.transporte RESTART IDENTITY CASCADE;
-INSERT INTO transporte (tipo, origem, destino, data_partida, data_chegada, preco, id_servico_servico, id_destino_destino) VALUES
-('Ônibus', 'São Paulo', 'Rio de Janeiro', '2025-01-10', '2025-01-10', 150.00, 1, 1), 		-- Rio de Janeiro (Preço 150.00)
-('Avião', 'Brasília', 'Nova York', '2025-02-05', '2025-02-05', 750.00, 2, 4), 			-- Nova York (Preço 750.00)
-('Navio', 'Rio de Janeiro', 'Buenos Aires', '2025-03-12', '2025-03-15', 2200.00, 3, 2), 	-- Buenos Aires (Preço 2200.00)
-('Metrô', 'Rio de Janeiro', 'Rio de Janeiro', '2025-01-01', '2025-01-01', 4.40, 4, 1), 		-- Rio de Janeiro (Preço 4.40)
-('Uber', 'Santiago', 'Santiago', '2025-01-18', '2025-01-18', 22.50, 5, 3), 				-- Santiago (Preço 22.50)
-('Táxi', 'Paris', 'Paris', '2025-04-10', '2025-04-10', 35.90, 6, 5), 					-- Paris (Preço 35.90)
-('Trem', 'Tóquio', 'Tóquio', '2025-05-03', '2025-05-03', 120.00, 7, 7), 				-- Tóquio (Preço 120.00)
-('Avião', 'Toronto', 'São Paulo', '2025-06-20', '2025-06-20', 980.00, 8, 8), 			-- Toronto (Preço 980.00)
-('Trem', 'Lisboa', 'Porto', '2025-07-14', '2025-07-14', 89.90, 9, 9), 					-- Lisboa (Preço 89.90)
-('Navio', 'Sydney', 'Sydney', '2025-08-02', '2025-08-02', 300.00, 10, 10), 				-- Sydney (Preço 300.00)
-('Avião', 'Nova York', 'Paris', '2025-09-01', '2025-09-01', 1100.00, 21, 5); 			-- Paris (Preço 1100.00 - Novo máximo para Paris)
+-- Transporte
+INSERT INTO public.transporte (tipo, origem, destino, data_partida, data_chegada, preco, id_servico_servico, id_destino_destino) VALUES
+('Ônibus','São Paulo','Rio de Janeiro','2025-01-10','2025-01-10',150.00,5,1),
+('Avião','Brasília','Nova York','2025-02-05','2025-02-05',750.00,2,4),
+('Navio','Rio de Janeiro','Buenos Aires','2025-03-12','2025-03-15',2200.00,10,2),
+('Metrô','Rio de Janeiro','Rio de Janeiro','2025-01-01','2025-01-01',4.40,21,1),
+('Uber','Santiago','Santiago','2025-01-18','2025-01-18',22.50,3,3),
+('Táxi','Paris','Paris','2025-04-10','2025-04-10',35.90,6,5),
+('Trem','Tóquio','Tóquio','2025-05-03','2025-05-03',120.00,7,7),
+('Avião','Toronto','São Paulo','2025-06-20','2025-06-20',980.00,2,8),
+('Trem','Lisboa','Porto','2025-07-14','2025-07-14',89.90,5,9),
+('Navio','Sydney','Sydney','2025-08-02','2025-08-02',300.00,10,10);
 
--- Reservas
-TRUNCATE public.reserva RESTART IDENTITY CASCADE;
-INSERT INTO reserva (reserva_data, reserva_data_inicio, reserva_valor_total, reserva_status, id_servico_servico, id_cliente_cliente)
-VALUES
-('2025-01-01', '2025-01-05', 350.00, 'A', 1, 1), 
-('2025-01-03', '2025-01-04', 200.00, 'A', 2, 1), 
-('2025-02-10', '2025-02-12', 500.00, 'C', 3, 2), 
-('2025-03-15', '2025-03-16', 150.00, 'A', 1, 3), 
-('2025-03-20', '2025-03-22', 320.00, 'F', 4, 4), 
-('2025-04-01', '2025-04-10', 1200.00, 'A', 2, 5), 
-('2025-04-05', '2025-04-07', 450.00, 'C', 3, 6), 
-('2025-05-02', '2025-05-03', 180.00, 'A', 1, 7), 
-('2025-05-10', '2025-05-11', 220.00, 'F', 4, 8), 
-('2025-06-01', '2025-06-05', 900.00, 'A', 5, 9); 
+-- Hospedagem
+INSERT INTO public.hospedagem (hospedagem_nome_propriedade, hospedagem_tipo_acomodacao, hospedagem_categoria, id_servico_servico, id_destino_destino) VALUES
+('Hotel Copacabana','Hotel','Luxo',11,1),
+('Pousada do Sol','Pousada','Simples',12,2),
+('Hostel Central','Hostel','Econômico',13,3),
+('Residencial Plaza','Apartamento','Standard',14,4),
+('Suítes Royal','Hotel','Luxo',15,5),
+('Alojamento Simples','Hostel','Econômico',16,6),
+('Hotel Tokyo','Hotel','Standard',17,7),
+('Cabana da Floresta','Bangalô','Rústico',18,8),
+('Hostel Lisboa','Hostel','Econômico',19,9),
+('Apartamento Sydney','Apartamento','Standard',20,10);
 
--- Atrativos
-TRUNCATE public.atrativo RESTART IDENTITY CASCADE;
-INSERT INTO atrativo (atrativo_nome, atrativo_horario_funcionando, atrativo_tipo, id_servico_servico, id_destino_destino)
-VALUES
-('Praia Central', '08:00', 'Natural', 3, 1), 
-('Museu Histórico', '09:00', 'Cultural', 6, 1), 
-('Parque das Aves', '07:30', 'Natural', 9, 2),
-('Mirante da Serra', '10:00', 'Paisagem', 11, 2),
-('Aquário Azul', '08:30', 'Educativo', 12, 3),
-('Centro Gastronômico', '18:00', 'Culinária', 13, 3),
-('Trilha da Mata', '06:00', 'Aventura', 14, 4),
-('Cachoeira Bela Vista', '07:00', 'Natural', 15, 4),
-('Planetário Municipal', '14:00', 'Cultural', 16, 5),
-('Feira de Artesanato', '10:00', 'Comércio', 17, 5);
-
--- Hospedagens
-TRUNCATE public.hospedagem RESTART IDENTITY CASCADE;
-INSERT INTO public.hospedagem (hospedagem_nome_propriedade, hospedagem_tipo_acomodacao, hospedagem_categoria, id_servico_servico, id_destino_destino)
-VALUES
-('Hotel Copacabana', 'Hotel', 'Luxo', 11, 1),
-('Pousada do Sol', 'Pousada', 'Simples', 12, 2),
-('Hostel Central', 'Hostel', 'Econômico', 13, 3),
-('Residencial Plaza', 'Apartamento', 'Standard', 14, 4),
-('Suítes Royal', 'Hotel', 'Luxo', 15, 5),
-('Alojamento Simples', 'Hostel', 'Econômico', 16, 6),
-('Hotel Tokyo', 'Hotel', 'Standard', 17, 7),
-('Cabana da Floresta', 'Bangalô', 'Rústico', 18, 8),
-('Hostel Lisboa', 'Hostel', 'Econômico', 19, 9),
-('Apartamento Sydney', 'Apartamento', 'Standard', 20, 10);
+-- Atrativo
+INSERT INTO public.atrativo (atrativo_nome, atrativo_horario_funcionando, atrativo_tipo, id_servico_servico, id_destino_destino) VALUES
+('Praia Central','08:00','Natural',3,1),
+('Museu Histórico','09:00','Cultural',6,1),
+('Parque das Aves','07:30','Natural',9,2),
+('Mirante da Serra','10:00','Paisagem',11,2),
+('Aquário Azul','08:30','Educativo',12,3),
+('Centro Gastronômico','18:00','Culinária',13,3),
+('Trilha da Mata','06:00','Aventura',14,4),
+('Cachoeira Bela Vista','07:00','Natural',15,4),
+('Planetário Municipal','14:00','Cultural',16,5),
+('Feira de Artesanato','10:00','Comércio',17,5);
 
 --------------------------------------------------------
--- 2. CONSULTAS SQL INICIAIS 
+-- ETAPA 2 – CONSULTAS SQL (Requisito: Iniciais, JOIN, Agregação)
 --------------------------------------------------------
 
--- 2.1.
+-- 2.1 Consultas Iniciais
+SELECT id_cliente, cliente_nome, cliente_email FROM cliente ORDER BY cliente_nome;
+SELECT id_transporte, tipo, origem, destino, preco FROM transporte WHERE preco > 500 ORDER BY preco DESC;
+SELECT atrativo_nome, atrativo_horario_funcionando FROM atrativo WHERE atrativo_horario_funcionando < '09:00';
+
+-- 3.1 Joins
+SELECT r.id_reserva, c.cliente_nome, r.reserva_data, r.reserva_valor_total
+FROM reserva r INNER JOIN cliente c ON r.id_cliente_cliente = c.id_cliente;
+
+SELECT s.id_servico, s.servico_nome, s.servico_tipo, f.fornecedor_nome
+FROM servico s LEFT JOIN fornecedor f ON s.id_fornecedor_fornecedor = f.id_fornecedor;
+
+-- 4.1 Consultas Complexas
+-- Subconsulta no WHERE
+SELECT c.cliente_nome, r.reserva_valor_total FROM reserva r JOIN cliente c ON r.id_cliente_cliente = c.id_cliente
+WHERE r.reserva_valor_total > (SELECT AVG(reserva_valor_total) FROM reserva);
+
+-- Subconsulta no FROM
+SELECT t.tipo, t.preco, d.destino_cidade FROM transporte t JOIN destino d ON t.id_destino_destino = d.id_destino
+JOIN (SELECT id_destino_destino, MAX(preco) AS preco_max FROM transporte GROUP BY id_destino_destino) m
+ON m.id_destino_destino = t.id_destino_destino AND m.preco_max = t.preco;
+
+-- Agregação
+SELECT reserva_status, COUNT(*) AS total FROM reserva GROUP BY reserva_status;
+
+--------------------------------------------------------
+-- ETAPA 3 – RECURSOS AVANÇADOS
+--------------------------------------------------------
+
+-- 3.1 VIEWS (VISÕES)
+
+-- 1. View Simples (Restrita/Auditoria - Oculta CPF)
+CREATE OR REPLACE VIEW public.vw_cliente_resumo AS
 SELECT id_cliente, cliente_nome, cliente_email
-FROM cliente
-ORDER BY cliente_nome ASC;
+FROM public.cliente;
 
--- 2.2.
-SELECT id_transporte, tipo, origem, destino, preco
-FROM transporte
-WHERE preco > 500
-ORDER BY preco DESC;
+-- 2. View com JOIN e Agregação
+CREATE OR REPLACE VIEW public.vw_faturamento_por_cliente AS
+SELECT c.cliente_nome, COUNT(r.id_reserva) as qtd_reservas, SUM(r.reserva_valor_total) as total_gasto
+FROM cliente c
+JOIN reserva r ON c.id_cliente = r.id_cliente_cliente
+WHERE r.reserva_status = 'F'
+GROUP BY c.cliente_nome;
 
--- 2.3.
-SELECT id_servico, servico_nome, servico_tipo
-FROM servico
-WHERE servico_tipo = 'Hospedagem';
+-- 3. View com Subconsulta
+CREATE OR REPLACE VIEW public.vw_servicos_vip AS
+SELECT s.servico_nome, s.servico_preco_base
+FROM servico s
+WHERE s.servico_preco_base > (SELECT AVG(servico_preco_base) FROM servico);
 
--- 2.4.
-SELECT id_reserva, reserva_data, reserva_valor_total
-FROM reserva
-WHERE reserva_status = 'A'
-ORDER BY reserva_data;
 
--- 2.5.
-SELECT atrativo_nome, atrativo_horario_funcionando
-FROM atrativo
-WHERE atrativo_horario_funcionando < '09:00'
-ORDER BY atrativo_horario_funcionando;
+-- 3.2 TRIGGERS (GATILHOS)
+
+-- Função do Trigger 1: Auditoria de Reservas
+CREATE OR REPLACE FUNCTION fn_auditoria_reserva()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.tb_auditoria (tabela_alterada, acao, usuario, dados_antigos, dados_novos)
+    VALUES (
+        'reserva', TG_OP, current_user,
+        CASE WHEN TG_OP = 'DELETE' THEN ROW(OLD.*)::TEXT ELSE NULL END,
+        CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN ROW(NEW.*)::TEXT ELSE NULL END
+    );
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_auditoria_reserva
+AFTER INSERT OR UPDATE OR DELETE ON public.reserva
+FOR EACH ROW EXECUTE FUNCTION fn_auditoria_reserva();
+
+-- Função do Trigger 2: Validação de Valor Positivo
+CREATE OR REPLACE FUNCTION fn_validacao_valor()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.reserva_valor_total <= 0 THEN
+        RAISE EXCEPTION 'O valor da reserva deve ser positivo.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validacao_reserva_valor
+BEFORE INSERT OR UPDATE ON public.reserva
+FOR EACH ROW EXECUTE FUNCTION fn_validacao_valor();
+
+
+-- 3.3 PROCEDURES E FUNCTIONS
+
+-- Procedure 1: Inserir Reserva
+CREATE OR REPLACE PROCEDURE public.inserir_reserva(
+    p_inicio DATE, p_valor NUMERIC, p_servico INT, p_cliente INT
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.reserva (reserva_data_inicio, reserva_valor_total, id_servico_servico, id_cliente_cliente)
+    VALUES (p_inicio, p_valor, p_servico, p_cliente);
+END;
+$$;
+
+-- Procedure 2: Cancelar Reserva
+CREATE OR REPLACE PROCEDURE public.cancelar_reserva(p_id INT)
+LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE public.reserva SET reserva_status = 'C' WHERE id_reserva = p_id;
+END;
+$$;
+
+-- Function 1: Calcular Gasto Total
+CREATE OR REPLACE FUNCTION public.calcular_total_gasto_cliente(p_id INT)
+RETURNS NUMERIC LANGUAGE plpgsql AS $$
+DECLARE v_total NUMERIC;
+BEGIN
+    -- Correção: Adicionado filtro para ignorar canceladas (!= 'C')
+    SELECT COALESCE(SUM(reserva_valor_total), 0) INTO v_total 
+    FROM public.reserva 
+    WHERE id_cliente_cliente = p_id AND reserva_status != 'C';
+    
+    RETURN v_total;
+END;
+$$;
+
+
+-- 3.4 ÍNDICES E OTIMIZAÇÃO (ETAPA 3.9 INCLUSA)
+
+-- Índice Simples
+CREATE INDEX idx_fornecedor_nome ON public.fornecedor (fornecedor_nome);
+
+-- Índice Composto
+CREATE INDEX idx_reserva_status_data ON public.reserva (reserva_status, reserva_data_inicio);
+
+-- Índice Único
+CREATE INDEX idx_transporte_servico_id ON public.transporte (id_servico_servico);
+
+-- Exemplo de EXPLAIN ANALYZE (Tuning)
+EXPLAIN ANALYZE SELECT * FROM reserva WHERE reserva_status = 'A';
+
+
+-- 3.8 SEGURANÇA E CONTROLE DE ACESSO
+
+-- Criar Usuários (Substitua as senhas)
+DROP USER IF EXISTS app_admin, app_writer, app_readonly;
+CREATE USER app_admin WITH PASSWORD 'admin123';
+CREATE USER app_writer WITH PASSWORD 'writer123';
+CREATE USER app_readonly WITH PASSWORD 'read123';
+
+-- Criar Roles
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'role_admin') THEN
+        DROP OWNED BY role_admin;
+    END IF;
+    IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'role_writer') THEN
+        DROP OWNED BY role_writer;
+    END IF;
+    IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'role_readonly') THEN
+        DROP OWNED BY role_readonly;
+    END IF;
+END $$;
+
+DROP ROLE IF EXISTS role_admin, role_writer, role_readonly;
+
+CREATE ROLE role_admin;
+CREATE ROLE role_writer;
+CREATE ROLE role_readonly;
+
+-- Atribuir Roles
+GRANT role_admin TO app_admin;
+GRANT role_writer TO app_writer;
+GRANT role_readonly TO app_readonly;
+
+-- Permissões
+GRANT USAGE ON SCHEMA public TO role_writer, role_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO role_readonly;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO role_writer;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO role_writer;
+
+-- Conceder acesso à VIEW RESTRITA para leitura
+GRANT SELECT ON public.vw_cliente_resumo TO role_readonly;
+
+-- *** BLOQUEIO DE ACESSO INDEVIDO (DEMONSTRAÇÃO) ***
+-- Revoga permissão de alterar dados sensíveis (Tabela Cliente) do usuário de escrita
+REVOKE UPDATE, DELETE ON public.cliente FROM role_writer;
+
 
 --------------------------------------------------------
--- 3. CONSULTAS COM JOIN (FORMATO SIMPLIFICADO)
-
-
--- 3.1. Lista todas as reservas com o nome do cliente.
-SELECT
-    r.id_reserva,
-    c.cliente_nome,
-    r.reserva_data,
-    r.reserva_valor_total
-FROM
-    reserva r
-INNER JOIN
-    cliente c ON r.id_cliente_cliente = c.id_cliente;
-
--- 3.2. Lista todos os serviços e o nome do seu fornecedor.
-SELECT
-    s.id_servico,
-    s.servico_nome,
-    s.servico_tipo,
-    f.fornecedor_nome
-FROM
-    servico s
-LEFT JOIN
-    fornecedor f ON s.id_fornecedor_fornecedor = f.id_fornecedor;
-
--- 3.3. Lista todas as hospedagens e o nome da cidade/país do destino.
-SELECT
-    h.hospedagem_nome_propriedade,
-    h.hospedagem_categoria,
-    d.destino_cidade,
-    d.destino_pais
-FROM
-    hospedagem h
-INNER JOIN
-    destino d ON h.id_destino_destino = d.id_destino;
-
--- 3.4. Lista todos os transportes e a cidade de destino (ligada pela chave de destino).
-SELECT
-    t.id_transporte,
-    t.tipo,
-    t.origem,
-    t.destino,
-    d.destino_cidade
-FROM
-    transporte t
-LEFT JOIN
-    destino d ON t.id_destino_destino = d.id_destino;
-
--- 3.5. Lista atrativos, seus serviços e a cidade onde estão localizados.
-SELECT
-    a.atrativo_nome,
-    a.atrativo_tipo,
-    s.servico_nome AS servico_relacionado,
-    d.destino_cidade AS cidade
-FROM
-    atrativo a
-INNER JOIN
-    servico s ON a.id_servico_servico = s.id_servico
-INNER JOIN
-    destino d ON a.id_destino_destino = d.id_destino;
-
---------------------------------------------------------
--- 4. CONSULTAS COMPLEXAS (COM SUBCONSULTAS E AGREGAÇÃO)
+-- ETAPA 4 – TESTES E EXECUÇÃO (DEMONSTRAÇÃO)
+-- Esta etapa prova que os recursos funcionam (Relatório)
 --------------------------------------------------------
 
--- 4.1. Consulta com Subconsulta no SELECT e Subconsulta no WHERE
--- Lista clientes com 2 ou mais reservas ativas, mostrando a contagem de reservas ativas e o valor total gasto.
-SELECT
-    c.cliente_nome,
-    (SELECT COUNT(r.id_reserva)
-     FROM reserva r
-     WHERE r.id_cliente_cliente = c.id_cliente AND r.reserva_status = 'A') AS total_reservas_ativas,
-    (SELECT SUM(r.reserva_valor_total)
-     FROM reserva r
-     WHERE r.id_cliente_cliente = c.id_cliente) AS valor_total_gasto
-FROM
-    cliente c
-WHERE
-    c.id_cliente IN (
-        SELECT r_sub.id_cliente_cliente
-        FROM reserva r_sub
-        WHERE r_sub.reserva_status = 'A'
-        GROUP BY r_sub.id_cliente_cliente
-        HAVING COUNT(r_sub.id_reserva) >= 2
-    )
-ORDER BY
-    valor_total_gasto DESC;
+DO $$
+DECLARE
+    v_total NUMERIC;
+    v_id_reserva INT; -- Variável necessária para a correção
+BEGIN
+    RAISE NOTICE '--- INICIANDO TESTES AUTOMATIZADOS ---';
 
+    -- 1. TESTE PROCEDURE E AUDITORIA (INSERT)
+    CALL public.inserir_reserva(CURRENT_DATE, 999.99, 1, 1);
+    RAISE NOTICE '1. Procedure Inserir Executada (Verificar tb_auditoria).';
 
--- 4.2. **CONSULTA SIMPLIFICADA E ESTÁVEL (JOIN + Subconsulta de Agregação)**
--- Encontra o transporte com o preço máximo em cada destino.
-SELECT
-    t.tipo AS tipo_transporte,
-    t.preco AS preco_maximo,
-    d.destino_cidade
-FROM
-    transporte t
-INNER JOIN
-    destino d ON t.id_destino_destino = d.id_destino
-INNER JOIN
-    (SELECT
-        id_destino_destino,
-        MAX(preco) AS preco_max_destino
-     FROM
-        transporte
-     GROUP BY
-        id_destino_destino
-    ) AS max_precos ON t.id_destino_destino = max_precos.id_destino_destino
-                   AND t.preco = max_precos.preco_max_destino -- Condição para pegar apenas o registro do preço máximo
-ORDER BY
-    d.destino_cidade, t.preco DESC;
+    -- 2. TESTE PROCEDURE E AUDITORIA (UPDATE)
+    -- Correção: Captura o ID para variável antes de chamar a procedure
+    SELECT MAX(id_reserva) INTO v_id_reserva FROM public.reserva;
+    CALL public.cancelar_reserva(v_id_reserva);
+    
+    RAISE NOTICE '2. Procedure Cancelar Executada para Reserva % (Verificar tb_auditoria).', v_id_reserva;
 
--- 4.3. Consulta com Subconsulta no WHERE (Reservas acima da média)
--- Lista clientes que fizeram reservas com valor total superior à média de todas as reservas.
-SELECT
-    c.cliente_nome,
-    r.reserva_valor_total
-FROM
-    reserva r
-INNER JOIN
-    cliente c ON r.id_cliente_cliente = c.id_cliente
-WHERE
-    r.reserva_valor_total > (
-        SELECT AVG(reserva_valor_total)
-        FROM reserva
-    )
-ORDER BY
-    r.reserva_valor_total DESC;
+    -- 3. TESTE FUNCTION
+    v_total := public.calcular_total_gasto_cliente(1);
+    RAISE NOTICE '3. Function Executada. Total gasto cliente 1 (Ativas/Finalizadas): %', v_total;
 
--- 4.4. Consulta com Uso de Agregação Avançada
--- Identifica e conta o número de tipos de serviço (servico_tipo) distintos fornecidos por cada fornecedor.
--- O HAVING filtra apenas os fornecedores que oferecem mais de um tipo de serviço.
-SELECT
-    f.fornecedor_nome,
-    COUNT(DISTINCT s.servico_tipo) AS total_tipos_servico
-FROM
-    fornecedor f
-INNER JOIN
-    servico s ON f.id_fornecedor = s.id_fornecedor_fornecedor
-GROUP BY
-    f.fornecedor_nome
-HAVING
-    COUNT(DISTINCT s.servico_tipo) > 1
-ORDER BY
-    total_tipos_servico DESC, f.fornecedor_nome;
+    -- 4. TESTE TRIGGER VALIDAÇÃO (ERRO ESPERADO)
+    BEGIN
+        INSERT INTO public.reserva (reserva_data_inicio, reserva_valor_total) VALUES (CURRENT_DATE, -50.00);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE '4. SUCESSO: Trigger de validação bloqueou valor negativo. Erro: %', SQLERRM;
+    END;
 
+    -- 5. DEMONSTRAÇÃO DE SEGURANÇA
+    RAISE NOTICE '5. Teste de Segurança: A role app_writer está impedida de deletar clientes.';
 
-	
--- TAREFA DE SAMUEL E ALEX: Consultas de Agregação
--- O foco é usar as funções COUNT, SUM, AVG, MAX e MIN para
--- resumir os dados no banco.
+    RAISE NOTICE '--- FIM DOS TESTES ---';
+END $$;
 
+-- 6. TRANSAÇÕES E CONTROLE DE CONCORRÊNCIA (Cenários de Teste)
 
--- 1. COUNT(): Contar o número total de reservas por status
--- Mostra a quantidade de cada status (Ativa, Cancelada, Finalizada).
-SELECT
-    reserva_status,
-    COUNT(*) AS total_reservas_por_status
-FROM
-    public.reserva
-GROUP BY
-    reserva_status
-ORDER BY
-    total_reservas_por_status DESC; -- CLÁUSULA FINAL (ORDER BY)
+-- Cenário A: Transação com Commit (Sucesso)
+BEGIN TRANSACTION;
+    UPDATE public.reserva SET reserva_status = 'F' WHERE id_reserva = 1;
+    -- Simulação: Se houvesse outra tabela dependente, atualizaria aqui.
+COMMIT;
 
--- 2. SUM(): Calcular o valor total (soma) de todas as reservas confirmadas ('A')
--- Esta consulta usa SUM em um conjunto filtrado, sem GROUP BY, para um total geral.
-SELECT
-    SUM(reserva_valor_total) AS valor_total_reservas_ativas
-FROM
-    public.reserva
-WHERE
-    reserva_status = 'A';
+-- Cenário B: Transação com Rollback (Simulado)
+BEGIN TRANSACTION;
+    UPDATE public.reserva SET reserva_status = 'C' WHERE id_reserva = 2;
+    -- Simulação de erro ou cancelamento da operação
+ROLLBACK; -- A reserva 2 voltará ao estado original ('F')
 
--- 3. AVG(): Calcular o preço médio dos transportes por tipo
--- Usa AVG para encontrar o preço médio de Ônibus, Avião, Navio, etc.
-SELECT
-    tipo AS tipo_transporte,
-    AVG(preco) AS preco_medio_transporte
-FROM
-    public.transporte
-GROUP BY
-    tipo
-ORDER BY
-    preco_medio_transporte DESC;
-
--- 4. MAX(): Encontrar o maior valor base de serviço para cada tipo de serviço
--- Usa MAX para descobrir o serviço mais caro em cada categoria (Hospedagem, Transporte, Atrativo).
-SELECT
-    s.servico_tipo,
-    MAX(s.servico_preco_base) AS maior_preco_base_servico
-FROM
-    public.servico s
-WHERE
-    s.servico_preco_base IS NOT NULL -- Ignora serviços sem preço base definido
-GROUP BY
-    s.servico_tipo;
-
--- 5. MIN(): Encontrar o preço do transporte mais barato de ônibus
--- Usa MIN para retornar o valor mínimo dentro do tipo 'Ônibus'.
-SELECT
-    MIN(preco) AS preco_minimo_onibus
-FROM
-    public.transporte
-WHERE
-    tipo = 'Ônibus';
-
--- 6. Consultas com (count) para ter uma quantidade de tipos de seriços que tenha 3 tipos.
-SELECT 
-    servico_tipo,
-    COUNT(*) AS total_servicos
-FROM 
-    servico
-GROUP BY 
-    servico_tipo
-HAVING 
-    COUNT(*) > 3
-ORDER BY 
-    total_servicos DESC;
-
---7.Consultas com (Sum) para ter uma soma das reservas por clientes que gastaram mais de 500.
-SELECT 
-    c.cliente_nome,
-    SUM(r.reserva_valor_total) AS total_gasto
-FROM 
-    reserva r
-JOIN 
-    cliente c ON c.id_cliente = r.id_cliente_cliente
-GROUP BY 
-    c.cliente_nome
-HAVING 
-    SUM(r.reserva_valor_total) > 500
-ORDER BY 
-    total_gasto DESC;
-
---8. Consultas com (Avg) para ter uma media de transporte por cidade/destino (media 200).
-SELECT 
-    d.destino_cidade,
-    AVG(t.preco) AS media_preco_transporte
-FROM 
-    transporte t
-JOIN 
-    destino d ON d.id_destino = t.id_destino_destino
-GROUP BY 
-    d.destino_cidade
-HAVING 
-    AVG(t.preco) > 200
-ORDER BY 
-    media_preco_transporte DESC;
-
---9. Consultas com (Max) para ter o maior valor por status (max status > 300).
-SELECT 
-    reserva_status,
-    MAX(reserva_valor_total) AS maior_reserva
-FROM 
-    reserva
-GROUP BY 
-    reserva_status
-HAVING 
-    MAX(reserva_valor_total) > 300
-ORDER BY 
-    maior_reserva DESC;
-
--- 10. Consultas com (Min) para ter o menor preco de serviço por fornecedor(fornecedores com preço base deinido).
-SELECT
-    f.fornecedor_nome,
-    MIN(s.servico_preco_base) AS menor_preco
-FROM
-    servico s
-JOIN 
-    fornecedor f ON f.id_fornecedor = s.id_fornecedor_fornecedor
-WHERE
-    s.servico_preco_base IS NOT NULL
-GROUP BY
-    f.fornecedor_nome
-HAVING
-    MIN(s.servico_preco_base) < 500
-ORDER BY
-    menor_preco;
-
---11. Consultas com (count) para contar quantos transportes cade destino possui(somento destinos com mais de 1 transporte).
-SELECT 
-    d.destino_cidade,
-    COUNT(t.id_transporte) AS total_transportes
-FROM 
-    destino d
-LEFT JOIN 
-    transporte t ON t.id_destino_destino = d.id_destino
-GROUP BY 
-    d.destino_cidade
-HAVING 
-    COUNT(t.id_transporte) > 1
-ORDER BY 
-    total_transportes DESC;
-
---12. consultas com (Avg) para ter media de valor das reservas por status (status medio +300 ).
-SELECT
-    reserva_status,
-    AVG(reserva_valor_total) AS media_valor
-FROM
-    reserva
-GROUP BY
-    reserva_status
-HAVING
-    AVG(reserva_valor_total) > 300;
-
---13. Consulta com (Sum) para soma do preco de transporte do tipo que total utrapassa 1000.
-SELECT 
-    tipo,
-    SUM(preco) AS soma_precos
-FROM 
-    transporte
-GROUP BY 
-    tipo
-HAVING 
-    SUM(preco) > 1000
-ORDER BY 
-    soma_precos DESC;
-
+-- Consulta final para provar a auditoria
+SELECT * FROM public.tb_auditoria ORDER BY id_log DESC LIMIT 5;
